@@ -66,7 +66,7 @@ Two artifacts are needed under `data/iu_xray/`:
 2. The annotation file `iu_annotation_promptmrg.json` from
    [Google Drive](https://drive.google.com/file/d/1zV5wgi5QsIp6OuC1U95xvOmeAAlBGkRS/view?usp=sharing).
 
-### CheXbert (for clinical efficacy evaluation)
+### CheXbert
 
 The Clinical Efficacy metric depends on a trained
 [CheXbert](https://github.com/stanfordmlgroup/CheXbert) label
