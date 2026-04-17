@@ -2,8 +2,7 @@
 
 Code for the paper *Reliable Radiology Report Generation with
 Anatomy-Pathology-Aware Dynamic Reasoning and Representation
-Calibration*, currently under double-blind review at ACM Multimedia
-2026.
+Calibration*.
 
 APA-RRG is an anatomy-pathology-aware framework for radiology report
 generation that emulates the progressive workflow of a radiologist
