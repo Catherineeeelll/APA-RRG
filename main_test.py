@@ -19,7 +19,6 @@ from modules import utils
 from modules.metrics import compute_scores
 from modules.tester import Tester
 
-# PromptMRG state tokens (must match main_train.py).
 STATE_TOKENS = ["[BLA]", "[POS]", "[NEG]", "[UNC]"]
 
 
@@ -68,8 +67,6 @@ def parse_args():
 
     parser.add_argument("--clip_k", type=int, default=21)
 
-    # Module switches (must match the configuration the checkpoint was
-    # trained with).
     parser.add_argument("--use_dap_graph", action="store_true")
     parser.add_argument("--use_parc", action="store_true")
     parser.add_argument("--use_apg", action="store_true")
@@ -177,8 +174,7 @@ def main():
     )[0]
 
     print("\n[Building] Model...")
-    # Must match the hybrid prompt template used in main_train.py so
-    # that prompt_length aligns with the trained checkpoint.
+   
     prompt_temp = empty_prompt() + " ".join([STATE_TOKENS[0]] * 18) + " "
     model = blip_decoder(
         args,
