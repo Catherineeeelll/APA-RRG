@@ -22,7 +22,6 @@ from torch.utils.data import Dataset
 from models.apg import build_prompt_from_labels
 from .utils import my_pre_caption
 
-# PromptMRG label codes: 0=BLA, 1=POS, 2=NEG, 3=UNC.
 STATE_TOKENS = ["[BLA]", "[POS]", "[NEG]", "[UNC]"]
 
 
