@@ -19,6 +19,9 @@ from modules import utils
 from modules.metrics import compute_scores
 from modules.tester import Tester
 
+# PromptMRG state tokens (must match main_train.py).
+STATE_TOKENS = ["[BLA]", "[POS]", "[NEG]", "[UNC]"]
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -95,6 +98,7 @@ def setup_tokenizer():
     APG region tokens. The set of added tokens must match the one used by
     main_train.py so that the checkpoint vocabulary aligns.
     """
+
     from transformers import BertTokenizer
 
     bert_model_name = "bert-base-uncased"
@@ -173,7 +177,9 @@ def main():
     )[0]
 
     print("\n[Building] Model...")
-    prompt_temp = empty_prompt()
+    # Must match the hybrid prompt template used in main_train.py so
+    # that prompt_length aligns with the trained checkpoint.
+    prompt_temp = empty_prompt() + " ".join([STATE_TOKENS[0]] * 18) + " "
     model = blip_decoder(
         args,
         tokenizer,
