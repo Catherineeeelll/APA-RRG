@@ -24,8 +24,7 @@ from modules.trainer import Trainer
 os.environ["TOKENIZERS_PARALLELISM"] = "True"
 
 
-# PromptMRG state tokens used to construct the per-disease segment of the
-# hybrid APG prompt template.
+# state tokens used to construct the per-disease segment of the hybrid APG prompt template.
 STATE_TOKENS = ["[BLA]", "[POS]", "[NEG]", "[UNC]"]
 
 
@@ -78,7 +77,7 @@ def parse_args():
     parser.add_argument("--dist_url", default="env://")
     parser.add_argument("--device", default="cuda")
 
-    # Loss weights (Eq. 8).
+    # Loss weights.
     parser.add_argument("--lambda_cls", type=float, default=4.0)
     parser.add_argument("--lambda_str", type=float, default=0.1)
 
@@ -144,10 +143,10 @@ def load_pretrained_weights(model, pretrained_path):
     model_dict = model.state_dict()
 
     # The new model adds 12 region tokens to the tokenizer on top of the
-    # 4 PromptMRG state tokens. The token embedding and the LM head bias
+    # 4 state tokens. The token embedding and the LM head bias
     # therefore have a larger first dimension than the source checkpoint.
     # We expand the source tensors row-wise so that the original
-    # PromptMRG embeddings (rows 0..n_src-1, including [BLA]/[POS]/[NEG]/
+    # embeddings (rows 0..n_src-1, including [BLA]/[POS]/[NEG]/
     # [UNC]) are preserved while the new region-token rows fall back to
     # the freshly resized embedding values.
     expandable_keys = [
@@ -191,7 +190,7 @@ def warmstart_region_tokens(model, tokenizer):
     tokens.
 
     The twelve tokens emitted by ``all_region_tokens()`` are appended to
-    the tokenizer on top of the PromptMRG vocabulary and would otherwise
+    the tokenizer on top of the vocabulary and would otherwise
     remain at random initialisation after ``load_pretrained_weights``
     finishes (because the PromptMRG checkpoint has no rows for them).
     Initialising each ``[L_l:POS]`` row from the pretrained ``[POS]`` row,
@@ -310,9 +309,7 @@ def main():
     )
 
     print("\n[Building] Model...")
-    # Six APG region tokens followed by eighteen PromptMRG state tokens.
-    # The composite template determines ``prompt_length`` inside the
-    # decoder, so that LM-loss masking covers both segments exactly.
+
     prompt_temp = build_prompt_template(num_diseases=18)
     model = blip_decoder(
         args,
