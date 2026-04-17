@@ -24,6 +24,11 @@ from modules.trainer import Trainer
 os.environ["TOKENIZERS_PARALLELISM"] = "True"
 
 
+# PromptMRG state tokens used to construct the per-disease segment of the
+# hybrid APG prompt template.
+STATE_TOKENS = ["[BLA]", "[POS]", "[NEG]", "[UNC]"]
+
+
 def parse_args():
     parser = argparse.ArgumentParser()
 
@@ -115,7 +120,7 @@ def parse_args():
 def setup_tokenizer():
     """Build the BERT tokenizer extended with PromptMRG state tokens and
     APG region tokens. Uses the public HuggingFace ``bert-base-uncased``
-    checkpoint, which is downloaded on first use.
+    checkpoint, which is downloaded automatically on first use.
     """
     from transformers import BertTokenizer
 
@@ -179,6 +184,62 @@ def load_pretrained_weights(model, pretrained_path):
 
     model.load_state_dict(filtered, strict=False)
     return model
+
+
+def warmstart_region_tokens(model, tokenizer):
+    """Inherit the pretrained [POS]/[NEG] embeddings into the APG region
+    tokens.
+
+    The twelve tokens emitted by ``all_region_tokens()`` are appended to
+    the tokenizer on top of the PromptMRG vocabulary and would otherwise
+    remain at random initialisation after ``load_pretrained_weights``
+    finishes (because the PromptMRG checkpoint has no rows for them).
+    Initialising each ``[L_l:POS]`` row from the pretrained ``[POS]`` row,
+    and each ``[L_l:NEG]`` row from ``[NEG]``, preserves the positive and
+    negative semantics that BERT and PromptMRG have already learned, so
+    only the regional specialisation needs to be acquired during
+    fine-tuning.
+
+    Four tensors that participate in the language-modelling head are kept
+    in sync: the input word embedding, the decoder projection weight and
+    bias, and the output bias. These are the same four tensors expanded
+    row-wise inside ``load_pretrained_weights``.
+    """
+    pos_id = tokenizer.convert_tokens_to_ids("[POS]")
+    neg_id = tokenizer.convert_tokens_to_ids("[NEG]")
+
+    emb = model.text_decoder.bert.embeddings.word_embeddings.weight.data
+    dec_w = model.text_decoder.cls.predictions.decoder.weight.data
+    dec_b = model.text_decoder.cls.predictions.decoder.bias.data
+    out_b = model.text_decoder.cls.predictions.bias.data
+
+    region_tokens = all_region_tokens()
+    with torch.no_grad():
+        for tok in region_tokens:
+            tid = tokenizer.convert_tokens_to_ids(tok)
+            src = pos_id if tok.endswith(":POS]") else neg_id
+            emb[tid].copy_(emb[src])
+            dec_w[tid].copy_(dec_w[src])
+            dec_b[tid] = dec_b[src].item()
+            out_b[tid] = out_b[src].item()
+
+    print(
+        f"[Warmstart] Initialised {len(region_tokens)} region tokens "
+        "from [POS]/[NEG]"
+    )
+
+
+def build_prompt_template(num_diseases=18):
+    """Build the placeholder prompt used to compute ``prompt_length`` at
+    model construction time.
+
+    The template mirrors the decoder input at training and inference
+    time: six APG region tokens followed by ``num_diseases`` per-disease
+    state tokens. All placeholder state tokens use ``[BLA]``, which has
+    the same embedding slot as any of the four PromptMRG state codes and
+    therefore yields the correct tokenised length.
+    """
+    return empty_prompt() + " ".join([STATE_TOKENS[0]] * num_diseases) + " "
 
 
 def main():
@@ -249,7 +310,10 @@ def main():
     )
 
     print("\n[Building] Model...")
-    prompt_temp = empty_prompt()  # Six region tokens, used for prompt_length.
+    # Six APG region tokens followed by eighteen PromptMRG state tokens.
+    # The composite template determines ``prompt_length`` inside the
+    # decoder, so that LM-loss masking covers both segments exactly.
+    prompt_temp = build_prompt_template(num_diseases=18)
     model = blip_decoder(
         args,
         tokenizer,
@@ -258,6 +322,7 @@ def main():
         bert_path=bert_model_name,
     )
     model = load_pretrained_weights(model, args.load_pretrained)
+    warmstart_region_tokens(model, tokenizer)
 
     criterion_cls = nn.CrossEntropyLoss()
     metrics = compute_scores
