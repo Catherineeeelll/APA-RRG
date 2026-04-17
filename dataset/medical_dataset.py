@@ -4,7 +4,11 @@ Medical dataset for APA-RRG.
 The training prompt is constructed from ground-truth disease labels and
 follows the Anatomy-Aware Prompt Generation scheme defined in
 models/apg.py. Each sample is prefixed with six region tokens of the form
-[L_l:POS] / [L_l:NEG] before the actual report text.
+[L_l:POS] / [L_l:NEG], followed by the eighteen per-disease state tokens
+inherited from the PromptMRG classification branch, and then the actual
+report text. The APG region tokens provide anatomical structure, while
+the per-disease state tokens carry fine-grained conditioning that the
+decoder uses to recover disease-specific phrasing during generation.
 """
 
 import json
@@ -17,6 +21,19 @@ from torch.utils.data import Dataset
 
 from models.apg import build_prompt_from_labels
 from .utils import my_pre_caption
+
+# PromptMRG label codes: 0=BLA, 1=POS, 2=NEG, 3=UNC.
+STATE_TOKENS = ["[BLA]", "[POS]", "[NEG]", "[UNC]"]
+
+
+def build_state_prompt(cls_labels):
+    """Build an 18-token per-disease state prompt from integer labels.
+
+    Mirrors the PromptMRG convention so that the BERT decoder is
+    conditioned on fine-grained per-disease evidence in addition to the
+    six APG region tokens emitted by Algorithm S3.
+    """
+    return " ".join(STATE_TOKENS[int(l)] for l in cls_labels) + " "
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 Image.MAX_IMAGE_PIXELS = None
@@ -52,7 +69,7 @@ class generation_train(Dataset):
             self.clip_features = np.array(json.load(f))
 
         print(f"[Dataset] Train samples: {len(self.ann)}")
-        print("[Dataset] Using APG region-aware prompts (six tokens)")
+        print("[Dataset] Using APG region tokens + PromptMRG state tokens")
 
     def __len__(self):
         return len(self.ann)
@@ -71,9 +88,12 @@ class generation_train(Dataset):
 
         cls_labels = ann["labels"]
 
-        # APG prompt from ground-truth labels (six region tokens).
-        prompt = build_prompt_from_labels(cls_labels)
-        caption = prompt + my_pre_caption(ann["report"], self.max_words)
+        # APG region-aware prompt (Algorithm S3) followed by the
+        # PromptMRG per-disease state tokens. Both segments are conditioned
+        # on the ground-truth labels at training time.
+        region_prompt = build_prompt_from_labels(cls_labels)
+        state_prompt = build_state_prompt(cls_labels)
+        caption = region_prompt + state_prompt + my_pre_caption(ann["report"], self.max_words)
 
         cls_labels = torch.from_numpy(np.array(cls_labels)).long()
         clip_indices = ann["clip_indices"][: self.args.clip_k]
