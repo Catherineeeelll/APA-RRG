@@ -32,6 +32,10 @@ from models.structure_loss import StructureLoss
 warnings.filterwarnings("ignore")
 
 
+# PromptMRG state token codes: 0=BLA, 1=POS, 2=NEG, 3=UNC.
+STATE_TOKENS = ["[BLA]", "[POS]", "[NEG]", "[UNC]"]
+
+
 class BLIP_Decoder(nn.Module):
     """End-to-end APA-RRG model."""
 
@@ -252,13 +256,25 @@ class BLIP_Decoder(nn.Module):
         cls_preds_softmax = F.softmax(cls_preds, dim=1)
         cls_preds_logits = cls_preds_softmax[:, 1, :14]  # POS prob, 14 CheXpert
 
-        # Build prompts (Eq. 6 and Eq. 7) from the predicted positive
-        # probabilities. The 14 CheXpert pathologies determine the regional
-        # scores; auxiliary nodes do not contribute.
+        # Build prompts from the predicted probabilities. Each sample
+        # receives the six APG region tokens (Eq. 6 and Eq. 7) followed by
+        # the eighteen per-disease state tokens drawn from the
+        # argmax over {BLA, POS, NEG, UNC} of the refreshed classification
+        # logits. The two segments are concatenated before being fed to
+        # the decoder so that the generated report is conditioned on both
+        # anatomical structure and fine-grained disease evidence.
         threshold = getattr(self.args, "apg_threshold", 0.5)
+        state_argmax = cls_preds_softmax.argmax(dim=1)  # [B, 18], values in {0,1,2,3}
         prompts = []
         for j in range(image.size(0)):
-            prompts.append(build_prompt_from_probs(cls_preds_logits[j], threshold=threshold))
+            region_prompt = build_prompt_from_probs(
+                cls_preds_logits[j], threshold=threshold
+            )
+            state_prompt = (
+                " ".join(STATE_TOKENS[int(state_argmax[j, i])] for i in range(18))
+                + " "
+            )
+            prompts.append(region_prompt + state_prompt)
 
         if not sample:
             image_embeds = image_embeds.repeat_interleave(num_beams, dim=0)
