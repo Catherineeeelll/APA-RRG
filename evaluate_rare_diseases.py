@@ -195,7 +195,9 @@ def main():
     tokenizer.add_tokens(all_region_tokens())
     print(f"[Tokenizer] vocab_size = {len(tokenizer)}")
 
-    prompt_temp = empty_prompt()
+    STATE_TOKENS = ["[BLA]", "[POS]", "[NEG]", "[UNC]"]
+
+    prompt_temp = empty_prompt() + " ".join([STATE_TOKENS[0]] * 18) + " "
     model = blip_decoder(
         args,
         tokenizer,
