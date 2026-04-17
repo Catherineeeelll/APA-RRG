@@ -120,32 +120,28 @@ The script reads the PromptMRG-style annotation file and writes an
 deterministic given the input annotation, so any execution reproduces
 the exact same prior.
 
-## Pretrained Checkpoints
+## Pretrained Weights
 
-We provide two checkpoints. The first is the PromptMRG backbone used
-to warm-start training, released by the original PromptMRG authors.
-The second is our fully trained APA-RRG model that can be used
-directly for evaluation without retraining.
+We provide two checkpoints for different use cases. Both were trained
+with images from [R2Gen](https://github.com/zhjohnchan/R2Gen). If you
+use images processed by yourself, you may obtain degraded performance
+with these weights. In this case, you need to train a model by
+yourself.
 
-| Checkpoint | Purpose | Download |
-|------------|---------|----------|
-| `model_promptmrg_20240305.pth` | Warm-start backbone (optional, for training only) | [Google Drive](https://drive.google.com/file/d/1s4AoLnnGOysOQkdILhhFCL59LyQtRHGa/view?usp=drive_link) |
-| `model_best_aparrg.pth` | Trained APA-RRG (for direct evaluation) | [Google Drive](https://drive.google.com/file/d/1lliZlxwVAlpZk6clUxs-6EE42jdT8o-K/view?usp=drive_link) |
+**APA-RRG (ours).** The fully trained APA-RRG model, which can be used
+for direct evaluation or as a warm-start for further training. All
+modules (DAP-G, PARC, APG) are included. Download from
+[Google Drive](https://drive.google.com/file/d/1lliZlxwVAlpZk6clUxs-6EE42jdT8o-K/view?usp=drive_link)
+and place it under `results/apa_rrg/`.
 
-Place the files as follows:
-
-```
-results/
-|--model_promptmrg/
-|  |--model_promptmrg_20240305.pth    # only needed if training from scratch
-|--apa_rrg/
-|  |--model_best.pth                  # rename model_best_aparrg.pth to this
-```
-
-Both checkpoints were produced using the
-[R2Gen](https://github.com/zhjohnchan/R2Gen) image preprocessing
-pipeline. If your images come from a different pipeline, performance
-may degrade.
+**PromptMRG backbone.** The base PromptMRG checkpoint released by its
+original authors, containing only the visual encoder, memory module,
+classification head, and text decoder. DAP-G, PARC, and APG weights
+are not included and will be randomly initialized. This checkpoint can
+only be used as a warm-start for training. Download
+`model_promptmrg_20240305.pth` from
+[Google Drive](https://drive.google.com/file/d/1s4AoLnnGOysOQkdILhhFCL59LyQtRHGa/view?usp=drive_link)
+and place it under `results/model_promptmrg/`.
 
 ## Training
 
@@ -156,18 +152,17 @@ bash train_mimic_cxr.sh
 ```
 
 All hyperparameters are documented inline within the shell script and
-should not need to be edited for reproduction. The script expects the
-PromptMRG warm-start checkpoint at
-`results/model_promptmrg/model_promptmrg_20240305.pth`. To skip the
-warm-start and train from a randomly initialized backbone, override
-`--load_pretrained ""` inside the script. Trained checkpoints are
+should not need to be edited for reproduction. Trained checkpoints are
 written to `results/apa_rrg/`.
+
+By default the script warm-starts from the PromptMRG backbone. To
+warm-start from the fully trained APA-RRG checkpoint instead, change
+the `--load_pretrained` path inside the script. To skip warm-starting
+entirely, set `--load_pretrained ""`.
 
 ## Evaluation
 
-To evaluate with the provided APA-RRG checkpoint, download
-`model_best_aparrg.pth` from the table above, rename it to
-`model_best.pth`, and place it under `results/apa_rrg/`. Then run:
+Two helper scripts cover the standard evaluation protocols.
 
 ```
 bash test_mimic_cxr.sh    # MIMIC-CXR test split
