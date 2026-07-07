@@ -43,7 +43,7 @@ are listed below.
 Three artifacts are needed under `data/mimic_cxr/`:
 
 1. The chest X-ray images themselves. The official source is
-   [PhysioNet](https://www.physionet.org/content/mimic-cxr-jpg/2.0.0/),
+   [PhysioNet](https://www.physionet.org/content/mimic-cxr-jpg/2.1.0/),
    which requires credentialed access. A pre-resized copy is also
    distributed by the [R2Gen](https://github.com/zhjohnchan/R2Gen)
    project and is what we use in our experiments.
